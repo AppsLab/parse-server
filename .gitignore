@@ -1,9 +1,3 @@
-kvroot/
-nosqldb.logconf.json
-nosql-test
-  
-*\#*
-
 # Logs
 logs
 test_logs
