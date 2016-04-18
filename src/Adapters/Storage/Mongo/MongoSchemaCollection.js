@@ -88,7 +88,13 @@ class MongoSchemaCollection {
   // rejection reason are TBD.
   getAllSchemas() {
     return this._collection._rawFind({})
-    .then(schemas => schemas.map(mongoSchemaToParseSchema));
+      .then(
+        (schemas) => {
+          console.log(`schemas: ${schemas}`);
+          let parseSchema = schemas.map(mongoSchemaToParseSchema);
+          console.log(`mongoSchemaToParseSchema: ${parseSchema}`);
+          return parseSchema;
+        });
   }
 
   // Return a promise for the schema with the given name, in Parse format. If
