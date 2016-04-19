@@ -16,7 +16,8 @@
 // Default is MongoStorageAdapter.
 
 import DatabaseController from './Controllers/DatabaseController';
-import MongoStorageAdapter from './Adapters/Storage/Mongo/MongoStorageAdapter';
+//import MongoStorageAdapter from './Adapters/Storage/Mongo/MongoStorageAdapter';
+import MongoStorageAdapter from './Adapters/Storage/NoSQL/NoSQLStorageAdapter';
 
 const DefaultDatabaseURI = 'mongodb://localhost:27017/parse';
 

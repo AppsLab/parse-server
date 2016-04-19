@@ -1,5 +1,6 @@
 const SchemaCollectionName = '_SCHEMA';
 const NoSQLCollection  = require('./NoSQLCollection.js');
+const NoSQLSchemaCollection  = require('./NoSQLSchemaCollection.js');
 const Parse = require('parse/node');
 
 export class NoSQLStorageAdapter {
@@ -14,8 +15,8 @@ export class NoSQLStorageAdapter {
   configuration: Object;
   store: Object;
   parse: Object;
-  collections: Object;
-  schemaCollection: Object;
+  _collections: Object;
+  _schemaCollection: Object;
   
   // Public
   connectionPromise;
@@ -29,73 +30,104 @@ export class NoSQLStorageAdapter {
     // Try to change the log level, values are available under
     // nosqldb.LOGLEVELS path:
     //   OFF, FATAL, ERROR, WARN, INFO, DEBUG, TRACE, ALL
-    this.nosqldb.Logger.logLevel = nosqldb.LOGLEVELS.OFF;
+    this.nosqldb.Logger.logLevel = this.nosqldb.LOG_LEVELS.OFF;
     this.nosqldb.Logger.logToConsole = false;
     this.nosqldb.Logger.logToFile = false;
     
     // Working with types
-    this.writeOptions = nosqldb.Types.WriteOptions;
-    this.durability = nosqldb.Types.Durability;
-    this.syncPolicy = nosqldb.Types.SyncPolicy;
-    this.replicaAckPolicy = nosqldb.Types.ReplicaAckPolicy;
-    this.readOptions = nosqldb.Types.ReadOptions;
-    this.consistency = nosqldb.Types.SimpleConsistency;
+    this.writeOptions = this.nosqldb.Types.WriteOptions;
+    this.durability = this.nosqldb.Types.Durability;
+    this.syncPolicy = this.nosqldb.Types.SyncPolicy;
+    this.replicaAckPolicy = this.nosqldb.Types.ReplicaAckPolicy;
+    this.readOptions = this.nosqldb.Types.ReadOptions;
+    this.consistency = this.nosqldb.Types.SimpleConsistency;
     
     // Create a configuration object    
-    this.configuration = new nosqldb.Configuration();
+    this.configuration = new this.nosqldb.Configuration();
     this.configuration.proxy.startProxy = true;
     this.configuration.proxy.host = 'localhost:5010';
     this.configuration.storeHelperHosts = ['localhost:5000'];
     this.configuration.storeName = 'kvstore';
 
     // Create a store with the specified configuration
-    this.store = nosqldb.createStore(configuration);
-    this.collections = {};
+    this.store = this.nosqldb.createStore(this.configuration);
+    this._collections = {};
 
   }
 
   connect() {
+    console.log('connect IN');
     if (this.connectionPromise) {
+      console.log('connect OUT EXISTING PROMISE');            
       return this.connectionPromise;
     }
     this.connectionPromise = new Parse.Promise();
-    this.store.on('open', function() {
+    console.log('new connection promise', this.connectionPromise);
+//    console.log('this.store', this.store);
+    this.store.on('open', () => {
       console.log('Connected to store');
       this.connectionPromise.resolve(this.store);
+      console.log('connect OUT NEW PROMISE');      
     });
+    this.store.open();
     return this.connectionPromise;
   }
 
   collection(name: string) {
-    if (this.collections[name]) return Parse.Promise.as(this.collection[name]);
+    console.log('collection IN', name);
+    if (this._collections[name]) {
+      console.log('collection OUT EXISTS', name);
+      return Parse.Promise.as(this._collections[name]);
+    }
     const retPromise = new Parse.Promise();
     this.connect().then(() => {
-      this.collections[name] = new NoSQLCollection(name, this.store);
-      retPromise.resolve(this.collections[name]);
+      this.store.execute(`CREATE TABLE if not exists ${name} ( id long, primary key(id) )`,
+                         (err) => {
+                           if (err) {
+                             retPromise.reject(err);
+                             console.log('collection ERR', err);
+                             return;
+                           }
+                           this._collections[name] = new NoSQLCollection(name, this.store);
+                           retPromise.resolve(this._collections[name]);
+                           console.log('collection OUT', name);      
+                         });
     });
     return retPromise;
   }
 
   adaptiveCollection(name: string) {
-    return this.collection(string);
+    const dbName = `a${name}`;
+    console.log('adaptiveCollection IN', name);
+    const collectionPromise = this.collection(dbName);
+    console.log('adaptiveCollection OUT', name, collectionPromise);
+    return collectionPromise;
   }
 
   schemaCollection(collectionPrefix: string) {
-    if (this.schemaCollection) return Parse.Promise.as(this.schemaCollection);
+    console.log('schemaCollection IN', collectionPrefix);
+    console.log('here 2', this._schemaCollection);
+    if (this._schemaCollection) return Parse.Promise.as(this._schemaCollection);
     const retPromise = new Parse.Promise();
     this.adaptiveCollection(`${collectionPrefix}${SchemaCollectionName}`)
       .then((collection) => {
-        this.schemaCollection = new MongoSchemaCollection(collection);
-        retPromise.resolve(this.schemaCollection);
+        console.log('here 3');
+        this._schemaCollection = new NoSQLSchemaCollection(collection);
+        console.log('schemaCollection OUT', collectionPrefix);        
+        retPromise.resolve(this._schemaCollection);
       });
     return retPromise;
   }
 
   collectionExists(name: string) {
+    console.log('collectionExists IN', name);
+    console.log('collectionExists OUT', name);        
     return true;
   }
 
   dropCollection(name: string) {
+    console.log('dropCollection IN', name);
+    console.log('dropCollection OUT', name);    
 
   }
   
@@ -103,88 +135,3 @@ export class NoSQLStorageAdapter {
 
 export default NoSQLStorageAdapter;
 module.exports = NoSQLStorageAdapter; // Required for tests
-
-
-import MongoCollection from './MongoCollection';
-import MongoSchemaCollection from './MongoSchemaCollection';
-import {parse as parseUrl, format as formatUrl} from '../../../vendor/mongodbUrl';
-
-let mongodb = require('mongodb');
-let MongoClient = mongodb.MongoClient;
-
-const MongoSchemaCollectionName = '_SCHEMA';
-
-export class MongoStorageAdapter {
-  // Private
-  _uri: string;
-  _options: Object;
-  // Public
-  connectionPromise;
-  database;
-
-  constructor(uri: string, options: Object) {
-    this._uri = uri;
-    this._options = options;
-  }
-
-  connect() {
-    if (this.connectionPromise) {
-      return this.connectionPromise;
-    }
-
-    // parsing and re-formatting causes the auth value (if there) to get URI
-    // encoded
-    const encodedUri = formatUrl(parseUrl(this._uri));
-
-    this.connectionPromise = MongoClient.connect(encodedUri, this._options).then(database => {
-      this.database = database;
-    });
-    return this.connectionPromise;
-  }
-
-  collection(name: string) {
-    return this.connect().then(() => {
-      return this.database.collection(name);
-    });
-  }
-
-  adaptiveCollection(name: string) {
-    return this.connect()
-      .then(() => this.database.collection(name))
-      .then(rawCollection => new MongoCollection(rawCollection));
-  }
-
-  schemaCollection(collectionPrefix: string) {
-    return this.connect()
-      .then(() => this.adaptiveCollection(collectionPrefix + MongoSchemaCollectionName))
-      .then(collection => new MongoSchemaCollection(collection));
-  }
-
-  collectionExists(name: string) {
-    return this.connect().then(() => {
-      return this.database.listCollections({ name: name }).toArray();
-    }).then(collections => {
-      return collections.length > 0;
-    });
-  }
-
-  dropCollection(name: string) {
-    return this.collection(name).then(collection => collection.drop());
-  }
-  // Used for testing only right now.
-  collectionsContaining(match: string) {
-    return this.connect().then(() => {
-      return this.database.collections();
-    }).then(collections => {
-      return collections.filter(collection => {
-        if (collection.namespace.match(/\.system\./)) {
-          return false;
-        }
-        return (collection.collectionName.indexOf(match) == 0);
-      });
-    });
-  }
-}
-
-export default MongoStorageAdapter;
-module.exports = MongoStorageAdapter; // Required for tests

@@ -220,6 +220,7 @@ class Schema {
   perms;
 
   constructor(collection) {
+    console.log('constructor', collection);
     this._collection = collection;
 
     // this.data[className][fieldName] tells you the type of that field, in mongo format
@@ -230,6 +231,7 @@ class Schema {
   }
 
   reloadData() {
+    console.log('reloadData IN');
     this.data = {};
     this.perms = {};
     return this._collection.getAllSchemas().then(allSchemas => {
@@ -249,6 +251,7 @@ class Schema {
         );
 
         this.perms[schema.className] = schema.classLevelPermissions;
+        console.log('reloadData OUT');        
       });
     });
   }

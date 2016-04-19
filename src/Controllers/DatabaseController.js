@@ -414,6 +414,7 @@ function keysForQuery(query) {
 // Returns a promise for a list of related ids given an owning id.
 // className here is the owning className.
 DatabaseController.prototype.relatedIds = function(className, key, owningId) {
+  console.log('relatedIds IN', className, key, owningId);
   return this.adaptiveCollection(joinTableName(className, key))
     .then(coll => coll.find({owningId : owningId}))
     .then(results => results.map(r => r.relatedId));
@@ -431,7 +432,7 @@ DatabaseController.prototype.owningIds = function(className, key, relatedIds) {
 // equal-to-pointer constraints on relation fields.
 // Returns a promise that resolves when query is mutated
 DatabaseController.prototype.reduceInRelation = function(className, query, schema) {
-
+  console.log('reduceInRelation IN');
   // Search for an in-relation or equal-to-relation
   // Make it sequential for now, not sure of paralleization side effects
   if (query['$or']) {
@@ -480,6 +481,7 @@ DatabaseController.prototype.reduceInRelation = function(className, query, schem
       // $in / $nin
       let promises = queries.map((q) => {
         if (!q) {
+          console.log('reduceInRelation OUT 0');              
           return Promise.resolve();
         }
         return this.owningIds(className, key, q.relatedIds).then((ids) => {
@@ -488,11 +490,13 @@ DatabaseController.prototype.reduceInRelation = function(className, query, schem
           } else {
             this.addInObjectIdsIds(ids, query);
           }
+          console.log('reduceInRelation OUT 1');              
           return Promise.resolve();
         });
       });
 
       return Promise.all(promises).then(() => {
+        console.log('reduceInRelation OUT 2');        
         return Promise.resolve();
       })
 
@@ -501,6 +505,7 @@ DatabaseController.prototype.reduceInRelation = function(className, query, schem
   })
 
   return Promise.all(promises).then(() => {
+    console.log('reduceInRelation OUT 3');    
     return Promise.resolve(query);
   })
 };
@@ -508,27 +513,37 @@ DatabaseController.prototype.reduceInRelation = function(className, query, schem
 // Modifies query so that it no longer has $relatedTo
 // Returns a promise that resolves when query is mutated
 DatabaseController.prototype.reduceRelationKeys = function(className, query) {
-
+  console.log('reduceRelationKeys IN', className, query);
   if (query['$or']) {
     return Promise.all(query['$or'].map((aQuery) => {
-      return this.reduceRelationKeys(className, aQuery);
+      console.log('Here i0');            
+      reduceRelationKeys = this.reduceRelationKeys(className, aQuery);
+      console.log('reduceRelationKeys OUT 0');      
+      return reduceRelationKeys;
+
     }));
   }
-
+  console.log('here i4');
   var relatedTo = query['$relatedTo'];
   if (relatedTo) {
+    console.log('here i5');
     return this.relatedIds(
       relatedTo.object.className,
       relatedTo.key,
       relatedTo.object.objectId).then((ids) => {
+        console.log('Here i6');
         delete query['$relatedTo'];
+        console.log('Here i7');        
         this.addInObjectIdsIds(ids, query);
+        console.log('Here i8');        
         return this.reduceRelationKeys(className, query);
       });
   }
+  console.log('here EXIT', className, query);
 };
 
 DatabaseController.prototype.addInObjectIdsIds = function(ids = null, query) {
+  console.log('addInObjectIdsIds');  
   let idsFromString = typeof query.objectId === 'string' ? [query.objectId] : null;
   let idsFromEq = query.objectId && query.objectId['$eq'] ? [query.objectId['$eq']] : null;
   let idsFromIn = query.objectId && query.objectId['$in'] ? query.objectId['$in'] : null;
@@ -555,6 +570,7 @@ DatabaseController.prototype.addInObjectIdsIds = function(ids = null, query) {
 }
 
 DatabaseController.prototype.addNotInObjectIdsIds = function(ids = null, query) {
+  console.log('addNotInObjectIdsIds');  
   let idsFromNin = query.objectId && query.objectId['$nin'] ? query.objectId['$nin'] : null;
   let allIds = [idsFromNin, ids].filter(list => list !== null);
   let totalLength = allIds.reduce((memo, list) => memo + list.length, 0);
@@ -592,6 +608,7 @@ DatabaseController.prototype.addNotInObjectIdsIds = function(ids = null, query) 
 // anything about users, ideally. Then, improve the format of the ACL
 // arg to work like the others.
 DatabaseController.prototype.find = function(className, query, options = {}) {
+  console.log('find');  
   let mongoOptions = {};
   if (options.skip) {
     mongoOptions.skip = options.skip;
@@ -624,7 +641,10 @@ DatabaseController.prototype.find = function(className, query, options = {}) {
   })
   .then(() => this.reduceRelationKeys(className, query))
   .then(() => this.reduceInRelation(className, query, schema))
-  .then(() => this.adaptiveCollection(className))
+    .then(() => {
+      console.log('here 0');
+      return this.adaptiveCollection(className)
+    })
   .then(collection => {
     let mongoWhere = transform.transformWhere(schema, className, query);
     if (!isMaster) {
@@ -653,6 +673,7 @@ DatabaseController.prototype.find = function(className, query, options = {}) {
 };
 
 function joinTableName(className, key) {
+  console.log('joinTableName');
   return `_Join:${key}:${className}`;
 }
 

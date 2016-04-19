@@ -1,4 +1,81 @@
 import NoSQLCollection from './NoSQLCollection';
+const Parse = require('parse/node');
+
+function mongoFieldToParseSchemaField(type) {
+  if (type[0] === '*') {
+    return {
+      type: 'Pointer',
+      targetClass: type.slice(1),
+    };
+  }
+  if (type.startsWith('relation<')) {
+    return {
+      type: 'Relation',
+      targetClass: type.slice('relation<'.length, type.length - 1),
+    };
+  }
+  switch (type) {
+    case 'number':   return {type: 'Number'};
+    case 'string':   return {type: 'String'};
+    case 'boolean':  return {type: 'Boolean'};
+    case 'date':     return {type: 'Date'};
+    case 'map':
+    case 'object':   return {type: 'Object'};
+    case 'array':    return {type: 'Array'};
+    case 'geopoint': return {type: 'GeoPoint'};
+    case 'file':     return {type: 'File'};
+  }
+}
+
+const nonFieldSchemaKeys = ['_id', '_metadata', '_client_permissions'];
+function mongoSchemaFieldsToParseSchemaFields(schema) {
+  var fieldNames = Object.keys(schema).filter(key => nonFieldSchemaKeys.indexOf(key) === -1);
+  var response = fieldNames.reduce((obj, fieldName) => {
+    obj[fieldName] = mongoFieldToParseSchemaField(schema[fieldName])
+    return obj;
+  }, {});
+  response.ACL = {type: 'ACL'};
+  response.createdAt = {type: 'Date'};
+  response.updatedAt = {type: 'Date'};
+  response.objectId = {type: 'String'};
+  return response;
+}
+
+const defaultCLPS = Object.freeze({
+  find: {'*': true},
+  get: {'*': true},
+  create: {'*': true},
+  update: {'*': true},
+  delete: {'*': true},
+  addField: {'*': true},
+});
+
+function mongoSchemaToParseSchema(mongoSchema) {
+  let clpsFromMongoObject = {};
+  if (mongoSchema._metadata && mongoSchema._metadata.class_permissions) {
+    clpsFromMongoObject = mongoSchema._metadata.class_permissions;
+  }
+  return {
+    className: mongoSchema._id,
+    fields: mongoSchemaFieldsToParseSchemaFields(mongoSchema),
+    classLevelPermissions: {...defaultCLPS, ...clpsFromMongoObject},
+  };
+}
+
+function _mongoSchemaQueryFromNameQuery(name: string, query) {
+  return _mongoSchemaObjectFromNameFields(name, query);
+}
+
+function _mongoSchemaObjectFromNameFields(name: string, fields) {
+  let object = { _id: name };
+  if (fields) {
+    Object.keys(fields).forEach(key => {
+      object[key] = fields[key];
+    });
+  }
+  return object;
+}
+
 
 class NoSQLSchemaCollection {
   
@@ -7,105 +84,51 @@ class NoSQLSchemaCollection {
   constructor(collection: NoSQLCollection) {
     this.collection = collection;
   }
+  
 
+  
   // Return a promise for all schemas known to this adapter, in Parse format. In case the
   // schemas cannot be retrieved, returns a promise that rejects. Requirements fot the
   // rejection reason are TBD.
-  getAllSchemas() {
+  getAllSchemas() { 
+    const retPromise = new Parse.Promise();
     console.log('getAllSchemas()');
-    return [ { className: '_User',
-    fields: 
-     { username: { type: 'String' },
-       password: { type: 'String' },
-       email: { type: 'String' },
-       firstName: { type: 'String' },
-       lastName: { type: 'String' },
-       patContexts: { type: 'Object' },
-       phone: { type: 'String' },
-       ACL: { type: 'ACL' },
-       createdAt: { type: 'Date' },
-       updatedAt: { type: 'Date' },
-       objectId: { type: 'String' } },
-    classLevelPermissions: 
-     { find: { '*': true },
-       get: { '*': true },
-       create: { '*': true },
-       update: { '*': true },
-       delete: { '*': true },
-       addField: { '*': true } } },
-  { className: '_Session',
-    fields: 
-     { sessionToken: { type: 'String' },
-       user: { type: 'Pointer', targetClass: '_User' },
-       createdWith: { type: 'Object' },
-       restricted: { type: 'Boolean' },
-       expiresAt: { type: 'Date' },
-       installationId: { type: 'String' },
-       ACL: { type: 'ACL' },
-       createdAt: { type: 'Date' },
-       updatedAt: { type: 'Date' },
-       objectId: { type: 'String' } },
-    classLevelPermissions: 
-     { find: { '*': true },
-       get: { '*': true },
-       create: { '*': true },
-       update: { '*': true },
-       delete: { '*': true },
-       addField: { '*': true } } },
-  { className: 'UserSession',
-    fields: 
-     { patContexts: { type: 'Object' },
-       source: { type: 'String' },
-       user: { type: 'Pointer', targetClass: '_User' },
-       ACL: { type: 'ACL' },
-       createdAt: { type: 'Date' },
-       updatedAt: { type: 'Date' },
-       objectId: { type: 'String' } },
-    classLevelPermissions: 
-     { find: { '*': true },
-       get: { '*': true },
-       create: { '*': true },
-       update: { '*': true },
-       delete: { '*': true },
-       addField: { '*': true } } },
-  { className: 'Utterance',
-    fields: 
-     { response: { type: 'Object' },
-       patContexts: { type: 'Object' },
-       text: { type: 'String' },
-       output: { type: 'String' },
-       source: { type: 'String' },
-       user: { type: 'Pointer', targetClass: '_User' },
-       userFirstName: { type: 'String' },
-       userLastName: { type: 'String' },
-       actionIncomplete: { type: 'Boolean' },
-       error: { type: 'Object' },
-       ACL: { type: 'ACL' },
-       createdAt: { type: 'Date' },
-       updatedAt: { type: 'Date' },
-       objectId: { type: 'String' } },
-    classLevelPermissions: 
-     { find: { '*': true },
-       get: { '*': true },
-       create: { '*': true },
-       update: { '*': true },
-       delete: { '*': true },
-       addField: { '*': true } } },
-  { className: 'Something',
-    fields: 
-     { test: { type: 'String' },
-       response: { type: 'Object' },
-       ACL: { type: 'ACL' },
-       createdAt: { type: 'Date' },
-       updatedAt: { type: 'Date' },
-       objectId: { type: 'String' } },
-    classLevelPermissions: 
-     { find: { '*': true },
-       get: { '*': true },
-       create: { '*': true },
-       update: { '*': true },
-       delete: { '*': true },
-       addField: { '*': true } } } ];
+    const schemas =  [ { _id: '_User',
+                         username: 'string',
+                         password: 'string',
+                         email: 'string',
+                         firstName: 'string',
+                         lastName: 'string',
+                         patContexts: 'object',
+                         phone: 'string' },
+                       { _id: '_Session',
+                         sessionToken: 'string',
+                         user: '*_User',
+                         createdWith: 'object',
+                         restricted: 'boolean',
+                         expiresAt: 'date',
+                         installationId: 'string' },
+                       { _id: 'UserSession',
+                         patContexts: 'object',
+                         source: 'string',
+                         user: '*_User' },
+                       { _id: 'Utterance',
+                         response: 'object',
+                         patContexts: 'object',
+                         text: 'string',
+                         output: 'string',
+                         source: 'string',
+                         user: '*_User',
+                         userFirstName: 'string',
+                         userLastName: 'string',
+                         actionIncomplete: 'boolean',
+                         error: 'object' },
+                       { _id: 'Something', test: 'string', response: 'object' } ];
+    const parseSchema = schemas.map(mongoSchemaToParseSchema);
+    console.log(`mongoSchemaToParseSchema: ${util.inspect(parseSchema, false, null)}`);
+    retPromise.resolve(parseSchema);
+    return retPromise;
+
   }
 
   // Return a promise for the schema with the given name, in Parse format. If

@@ -1,3 +1,16 @@
+Get parse server code with debug messages
+git clone git@github.com:AppsLab/parse-server.git parse-server
+
+Get parse server code with nosql code
+git clone git@github.com:AppsLab/parse-server.git parse-server-nosql
+git checkout --track origin/
+
+Make changes and automatically update the library in pat-server
+babel -w src --out-dir ../pat-server/node_modules/parse-server/lib/
+
+Make changes and automatically update the library in pat-server-nosql
+babel -w src --out-dir ../pat-server-nosql/node_modules/parse-server/lib/
+
 ![Parse Server logo](.github/parse-server-logo.png?raw=true)
 
 [![Build Status](https://img.shields.io/travis/ParsePlatform/parse-server/master.svg?style=flat)](https://travis-ci.org/ParsePlatform/parse-server)
