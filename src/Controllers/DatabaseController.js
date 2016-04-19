@@ -508,9 +508,10 @@ DatabaseController.prototype.reduceInRelation = function(className, query, schem
 // Modifies query so that it no longer has $relatedTo
 // Returns a promise that resolves when query is mutated
 DatabaseController.prototype.reduceRelationKeys = function(className, query) {
-
+  console.log('MreduceRelationKeys IN', className, query);
   if (query['$or']) {
     return Promise.all(query['$or'].map((aQuery) => {
+      console.log('MreduceRelationKeys OUT 0');            
       return this.reduceRelationKeys(className, aQuery);
     }));
   }
@@ -523,9 +524,11 @@ DatabaseController.prototype.reduceRelationKeys = function(className, query) {
       relatedTo.object.objectId).then((ids) => {
         delete query['$relatedTo'];
         this.addInObjectIdsIds(ids, query);
+        console.log('MHere i8');
         return this.reduceRelationKeys(className, query);
       });
   }
+  console.log('Mhere EXIT', className, query);  
 };
 
 DatabaseController.prototype.addInObjectIdsIds = function(ids = null, query) {

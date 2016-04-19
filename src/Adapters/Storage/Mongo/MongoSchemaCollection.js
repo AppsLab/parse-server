@@ -1,6 +1,8 @@
 
 import MongoCollection from './MongoCollection';
 
+var util = require('util');
+
 function mongoFieldToParseSchemaField(type) {
   if (type[0] === '*') {
     return {
@@ -90,9 +92,9 @@ class MongoSchemaCollection {
     return this._collection._rawFind({})
       .then(
         (schemas) => {
-          console.log(`schemas: ${schemas}`);
+          console.log(`Mschemas: ${util.inspect(schemas, false, null)}`);
           let parseSchema = schemas.map(mongoSchemaToParseSchema);
-          console.log(`mongoSchemaToParseSchema: ${parseSchema}`);
+          console.log(`MmongoSchemaToParseSchema: ${util.inspect(parseSchema, false, null)}`);
           return parseSchema;
         });
   }

@@ -22,7 +22,9 @@ export class MongoStorageAdapter {
   }
 
   connect() {
+    console.log('Mconnect IN');
     if (this.connectionPromise) {
+      console.log('Mconnect OUT EXISTING');      
       return this.connectionPromise;
     }
 
@@ -32,23 +34,35 @@ export class MongoStorageAdapter {
 
     this.connectionPromise = MongoClient.connect(encodedUri, this._options).then(database => {
       this.database = database;
+      console.log('Mconnect OUT NEW');          
     });
     return this.connectionPromise;
   }
 
   collection(name: string) {
+    console.log('Mcollection IN', name);
     return this.connect().then(() => {
+      console.log('Mcolection OUT', name);
       return this.database.collection(name);
     });
   }
 
   adaptiveCollection(name: string) {
-    return this.connect()
+    console.log('MadaptiveCollection IN', name);
+    const collection = this.connect()
       .then(() => this.database.collection(name))
-      .then(rawCollection => new MongoCollection(rawCollection));
+          .then((rawCollection)  => {
+//            console.log('rawCollection', rawCollection);
+            const mongoCollection = new MongoCollection(rawCollection);
+            console.log('mongoCollection', mongoCollection);
+            return mongoCollection;
+          });
+    console.log('MadaptiveCollection OUT', name, collection);
+    return collection;
   }
 
   schemaCollection(collectionPrefix: string) {
+    console.log('MschemaCollection IN OUT', collectionPrefix);        
     return this.connect()
       .then(() => this.adaptiveCollection(collectionPrefix + MongoSchemaCollectionName))
       .then(collection => new MongoSchemaCollection(collection));

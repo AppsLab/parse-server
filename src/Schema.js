@@ -16,6 +16,8 @@
 
 var Parse = require('parse/node').Parse;
 var transform = require('./transform');
+const util = require('util');
+
 import MongoSchemaCollection from './Adapters/Storage/Mongo/MongoSchemaCollection';
 import _                     from 'lodash';
 
@@ -230,6 +232,7 @@ class Schema {
   }
 
   reloadData() {
+    console.log('reloadData IN');    
     this.data = {};
     this.perms = {};
     return this._collection.getAllSchemas().then(allSchemas => {
@@ -249,6 +252,7 @@ class Schema {
         );
 
         this.perms[schema.className] = schema.classLevelPermissions;
+        console.log('reloadData OUT', util.inspect(this.data, false, null));        
       });
     });
   }
