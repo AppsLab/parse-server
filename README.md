@@ -3,7 +3,10 @@ git clone git@github.com:AppsLab/parse-server.git parse-server
 
 Get parse server code with nosql code
 git clone git@github.com:AppsLab/parse-server.git parse-server-nosql
-git checkout --track origin/
+git checkout --track origin/nosql
+
+Needs to set up babel
+npm install --save-dev babel-cli
 
 Make changes and automatically update the library in pat-server
 babel -w src --out-dir ../pat-server/node_modules/parse-server/lib/
